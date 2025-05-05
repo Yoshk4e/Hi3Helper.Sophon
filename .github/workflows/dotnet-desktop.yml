@@ -15,69 +15,66 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Check out the code
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      # 2. Install .NET 9 SDK
-      - uses: actions/setup-dotnet@v3
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '9.0.x'
 
-      # 3. Restore only the projects that actually exist
-      - name: Restore projects
+      # Restore everything via the Test solution (covers all test projects) and the two library projects
+      - name: Restore all projects
         run: |
+          dotnet restore Test/Hi3Helper.Sophon.Test.sln
           dotnet restore Hi3Helper.Sophon.csproj
           dotnet restore Hi3Helper.Sophon.Universal.csproj
-          dotnet restore Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj
-          # If you ever add more Test/*.csproj, this next line will cover them:
-          for proj in Test/*.csproj; do
-            dotnet restore "$proj"
-          done
 
-      # 4. Publish all Test tools as Windows executables
+      # Publish each Test project by path
       - name: Publish Test tools (native EXEs)
         run: |
-          mkdir -p artifacts/Test
-          for proj in Test/*.csproj; do
-            name=$(basename "$proj" .csproj)
-            dotnet publish "$proj" \
-              -c Release \
-              -f net9.0 \
-              -r win-x64 \
-              --self-contained false \
-              -o "artifacts/Test/$name"
-          done
+          mkdir -p artifacts/Test/SophonDownload
+          dotnet publish Test/SophonDownload/SophonDownload.csproj \
+            -c Release -f net9.0 -r win-x64 --self-contained false \
+            -o artifacts/Test/SophonDownload
 
-      # 5. Publish the libraries (DLLs) for net9.0
-      - name: Publish libraries
+          mkdir -p artifacts/Test/SophonManifestInfo2Json
+          dotnet publish Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj \
+            -c Release -f net9.0 -r win-x64 --self-contained false \
+            -o artifacts/Test/SophonManifestInfo2Json
+
+          mkdir -p artifacts/Test/SophonUpdatePreload
+          dotnet publish Test/SophonUpdatePreload/SophonUpdatePreload.csproj \
+            -c Release -f net9.0 -r win-x64 --self-contained false \
+            -o artifacts/Test/SophonUpdatePreload
+
+      # Publish libraries
+      - name: Publish Libraries (DLLs)
         run: |
-          mkdir -p artifacts/Libraries
+          mkdir -p artifacts/Libraries/SophonLib
           dotnet publish Hi3Helper.Sophon.csproj \
             -c Release -f net9.0 \
             -o artifacts/Libraries/SophonLib
+
+          mkdir -p artifacts/Libraries/SophonUniversal
           dotnet publish Hi3Helper.Sophon.Universal.csproj \
             -c Release -f net9.0 \
             -o artifacts/Libraries/SophonUniversal
 
-      # 6. Zip everything
-      - name: Package artifacts
-        run: zip -r Hi3HelperTools.zip artifacts
-
-      # 7. Install GitHub CLI
-      - name: Install gh
+      # Package everything
+      - name: Zip artifacts
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gh
+          zip -r Hi3HelperTools.zip artifacts
 
-      # 8. Create or update a GitHub Release and upload the ZIP
-      - name: Publish Release
+      # Create or update GitHub Release via gh
+      - name: Create / Update Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ inputs.release_tag }}" Hi3HelperTools.zip \
             --repo "${{ github.repository }}" \
             --title "${{ inputs.release_name }} ${{ inputs.release_tag }}" \
-            --notes "Automated build of Hi3Helper.Sophon console tools and libraries." \
+            --notes "Automated build of Hi3Helper.Sophon tools" \
             --target "${{ github.sha }}" || \
           gh release upload "${{ inputs.release_tag }}" Hi3HelperTools.zip \
             --repo "${{ github.repository }}" --clobber
