@@ -1,4 +1,4 @@
-name: Build & Release Hi3Helper.Sophon Tools
+name: Build & Release Hi3Helper.Sophon
 
 on:
   workflow_dispatch:
@@ -15,40 +15,69 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Check out the code
       - uses: actions/checkout@v3
 
+      # 2. Install .NET 9 SDK
       - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '9.0.x'
 
+      # 3. Restore only the projects that actually exist
       - name: Restore projects
         run: |
           dotnet restore Hi3Helper.Sophon.csproj
           dotnet restore Hi3Helper.Sophon.Universal.csproj
           dotnet restore Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj
+          # If you ever add more Test/*.csproj, this next line will cover them:
+          for proj in Test/*.csproj; do
+            dotnet restore "$proj"
+          done
 
-      - name: Publish outputs
+      # 4. Publish all Test tools as Windows executables
+      - name: Publish Test tools (native EXEs)
         run: |
-          dotnet publish Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj -c Release -f net9.0 -o artifacts/SophonManifestInfo2Json
-          dotnet publish Hi3Helper.Sophon.csproj -c Release -f net9.0 -o artifacts/SophonLib/net9.0
-          dotnet publish Hi3Helper.Sophon.Universal.csproj -c Release -f net9.0 -o artifacts/SophonUniversal/net9.0
+          mkdir -p artifacts/Test
+          for proj in Test/*.csproj; do
+            name=$(basename "$proj" .csproj)
+            dotnet publish "$proj" \
+              -c Release \
+              -f net9.0 \
+              -r win-x64 \
+              --self-contained false \
+              -o "artifacts/Test/$name"
+          done
 
+      # 5. Publish the libraries (DLLs) for net9.0
+      - name: Publish libraries
+        run: |
+          mkdir -p artifacts/Libraries
+          dotnet publish Hi3Helper.Sophon.csproj \
+            -c Release -f net9.0 \
+            -o artifacts/Libraries/SophonLib
+          dotnet publish Hi3Helper.Sophon.Universal.csproj \
+            -c Release -f net9.0 \
+            -o artifacts/Libraries/SophonUniversal
+
+      # 6. Zip everything
       - name: Package artifacts
         run: zip -r Hi3HelperTools.zip artifacts
 
-      - name: Install GitHub CLI
+      # 7. Install GitHub CLI
+      - name: Install gh
         run: |
           sudo apt-get update
           sudo apt-get install -y gh
 
-      - name: Create or Update GitHub Release
+      # 8. Create or update a GitHub Release and upload the ZIP
+      - name: Publish Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ inputs.release_tag }}" Hi3HelperTools.zip \
             --repo "${{ github.repository }}" \
             --title "${{ inputs.release_name }} ${{ inputs.release_tag }}" \
-            --notes "Automated build of Hi3Helper.Sophon tools." \
+            --notes "Automated build of Hi3Helper.Sophon console tools and libraries." \
             --target "${{ github.sha }}" || \
           gh release upload "${{ inputs.release_tag }}" Hi3HelperTools.zip \
             --repo "${{ github.repository }}" --clobber
