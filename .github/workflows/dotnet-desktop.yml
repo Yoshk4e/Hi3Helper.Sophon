@@ -34,7 +34,7 @@ jobs:
           powershell Compress-Archive -Path artifacts/* -DestinationPath Hi3HelperTools.zip
 
       - name: Upload ZIP artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         with:
           name: Hi3HelperTools
           path: Hi3HelperTools.zip
