@@ -15,60 +15,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout your code
       - uses: actions/checkout@v3
 
-      # 2. Install the .NET 9 SDK
       - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '9.0.x'
 
-      # 3. Restore only the three existing projects
       - name: Restore projects
         run: |
           dotnet restore Hi3Helper.Sophon.csproj
           dotnet restore Hi3Helper.Sophon.Universal.csproj
           dotnet restore Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj
 
-      # 4. Publish the console tool and both libraries
       - name: Publish outputs
         run: |
-          # Console tool
-          dotnet publish Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj \
-            -c Release -f net9.0 \
-            -o artifacts/SophonManifestInfo2Json
+          dotnet publish Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj -c Release -f net9.0 -o artifacts/SophonManifestInfo2Json
+          dotnet publish Hi3Helper.Sophon.csproj -c Release -f net9.0 -o artifacts/SophonLib/net9.0
+          dotnet publish Hi3Helper.Sophon.Universal.csproj -c Release -f net9.0 -o artifacts/SophonUniversal/net9.0
 
-          # Main library (net9.0 build of multi-target project)
-          dotnet publish Hi3Helper.Sophon.csproj \
-            -c Release -f net9.0 \
-            -o artifacts/SophonLib/net9.0
-
-          # Universal library (net9.0 build)
-          dotnet publish Hi3Helper.Sophon.Universal.csproj \
-            -c Release -f net9.0 \
-            -o artifacts/SophonUniversal/net9.0
-
-      # 5. Zip everything
       - name: Package artifacts
         run: zip -r Hi3HelperTools.zip artifacts
 
-      # 6. Install GitHub CLI
-      - name: Install gh
+      - name: Install GitHub CLI
         run: |
           sudo apt-get update
           sudo apt-get install -y gh
 
-      # 7. Authenticate GitHub CLI
-      - name: Authenticate gh
+      - name: Create or Update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "$GITHUB_TOKEN" | gh auth login --with-token
-
-      # 8. Create or update a GitHub Release and upload the ZIP
-      - name: Publish Release
         run: |
           gh release create "${{ inputs.release_tag }}" Hi3HelperTools.zip \
+            --repo "${{ github.repository }}" \
             --title "${{ inputs.release_name }} ${{ inputs.release_tag }}" \
-            --notes "Automated build of Hi3Helper.Sophon console tool and libraries." \
+            --notes "Automated build of Hi3Helper.Sophon tools." \
             --target "${{ github.sha }}" || \
-          gh release upload "${{ inputs.release_tag }}" Hi3HelperTools.zip --clobber
+          gh release upload "${{ inputs.release_tag }}" Hi3HelperTools.zip \
+            --repo "${{ github.repository }}" --clobber
