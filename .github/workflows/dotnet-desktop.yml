@@ -8,7 +8,8 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # switch to Ubuntu to avoid the "Missing download info" issue
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
@@ -24,17 +25,21 @@ jobs:
 
       - name: Build and publish all tools
         run: |
-          dotnet publish Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj -c Release -o artifacts/SophonManifestInfo2Json
-          dotnet publish Test/SophonManifestInspector/SophonManifestInspector.csproj -c Release -o artifacts/SophonManifestInspector
-          dotnet publish Test/SophonPatchDiffReader/SophonPatchDiffReader.csproj -c Release -o artifacts/SophonPatchDiffReader
-          dotnet publish Hi3Helper.Sophon/Hi3Helper.Sophon.csproj -c Release -o artifacts/SophonLib
+          dotnet publish Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj \
+            -c Release -o artifacts/SophonManifestInfo2Json
+          dotnet publish Test/SophonManifestInspector/SophonManifestInspector.csproj \
+            -c Release -o artifacts/SophonManifestInspector
+          dotnet publish Test/SophonPatchDiffReader/SophonPatchDiffReader.csproj \
+            -c Release -o artifacts/SophonPatchDiffReader
+          dotnet publish Hi3Helper.Sophon/Hi3Helper.Sophon.csproj \
+            -c Release -o artifacts/SophonLib
 
       - name: Zip all artifacts
-        run: |
-          powershell Compress-Archive -Path artifacts/* -DestinationPath Hi3HelperTools.zip
+        run: zip -r Hi3HelperTools.zip artifacts
 
+      # pin to the official v3 release of upload-artifact
       - name: Upload ZIP artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: Hi3HelperTools
           path: Hi3HelperTools.zip
