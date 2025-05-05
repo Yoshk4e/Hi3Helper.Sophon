@@ -1,0 +1,40 @@
+name: Build and Package Hi3Helper Tools
+
+on:
+  push:
+    branches:
+      - net-9
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build and publish all tools
+        run: |
+          dotnet publish Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj -c Release -o artifacts/SophonManifestInfo2Json
+          dotnet publish Test/SophonManifestInspector/SophonManifestInspector.csproj -c Release -o artifacts/SophonManifestInspector
+          dotnet publish Test/SophonPatchDiffReader/SophonPatchDiffReader.csproj -c Release -o artifacts/SophonPatchDiffReader
+          dotnet publish Hi3Helper.Sophon/Hi3Helper.Sophon.csproj -c Release -o artifacts/SophonLib
+
+      - name: Zip all artifacts
+        run: |
+          powershell Compress-Archive -Path artifacts/* -DestinationPath Hi3HelperTools.zip
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Hi3HelperTools
+          path: Hi3HelperTools.zip
