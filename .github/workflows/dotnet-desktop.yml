@@ -1,16 +1,16 @@
-name: Build & Release Hi3Helper Tools
+name: Build & Release Hi3Helper.Sophon
 
 on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Release tag name (e.g. v5.6.0)'
+        description: 'Release tag (e.g. v5.6.0)'
         required: true
       release_name:
         description: 'Release title'
-        default: 'Hi3Helper Tools'
+        default: 'Hi3Helper.Sophon Tools'
       manifest_url:
-        description: '(Optional) manifest URL to decode after build'
+        description: '(Optional) manifest URL to decode'
         required: false
 
 jobs:
@@ -18,54 +18,52 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # 1. Check out the code
+      - uses: actions/checkout@v3
 
-      - name: Setup .NET 9 SDK
-        uses: actions/setup-dotnet@v3
+      # 2. Install .NET 9 SDK
+      - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '9.0.x'
 
+      # 3. Restore only the existing projects
       - name: Restore projects
         run: |
           dotnet restore Hi3Helper.Sophon.Universal.csproj
           dotnet restore Hi3Helper.Sophon.csproj
           dotnet restore Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj
-          dotnet restore Test/SophonManifestInspector/SophonManifestInspector.csproj
-          dotnet restore Test/SophonPatchDiffReader/SophonPatchDiffReader.csproj
 
-      - name: Build and publish all tools
+      # 4. Build & publish each
+      - name: Publish outputs
         run: |
-          dotnet publish Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj \
-            -c Release -o artifacts/SophonManifestInfo2Json
-          dotnet publish Test/SophonManifestInspector/SophonManifestInspector.csproj \
-            -c Release -o artifacts/SophonManifestInspector
-          dotnet publish Test/SophonPatchDiffReader/SophonPatchDiffReader.csproj \
-            -c Release -o artifacts/SophonPatchDiffReader
-          dotnet publish Hi3Helper.Sophon/Hi3Helper.Sophon.csproj \
-            -c Release -o artifacts/SophonLib
           dotnet publish Hi3Helper.Sophon.Universal.csproj \
             -c Release -o artifacts/SophonUniversal
+          dotnet publish Hi3Helper.Sophon.csproj \
+            -c Release -o artifacts/SophonLib
+          dotnet publish Test/SophonManifestInfo2Json/SophonManifestInfo2Json.csproj \
+            -c Release -o artifacts/SophonManifestInfo2Json
 
-      - name: Zip all artifacts
+      # 5. Zip everything up
+      - name: Package artifacts
         run: |
           zip -r Hi3HelperTools.zip artifacts
 
-      - name: Install GitHub CLI
+      # 6. Install GitHub CLI
+      - name: Install gh
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gh
+          sudo apt-get update && sudo apt-get install -y gh
 
-      - name: Authenticate gh
+      # 7. Authenticate gh
+      - name: Authenticate GitHub CLI
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "$GITHUB_TOKEN" | gh auth login --with-token
+        run: echo "$GITHUB_TOKEN" | gh auth login --with-token
 
-      - name: Create or Update Release
+      # 8. Create or update a GitHub Release and upload the ZIP
+      - name: Publish Release
         run: |
           gh release create "${{ inputs.release_tag }}" Hi3HelperTools.zip \
             --title "${{ inputs.release_name }} ${{ inputs.release_tag }}" \
-            --notes "Automated build of Hi3Helper tools." \
+            --notes "Automated build of Hi3Helper.Sophon tools" \
             --target "${{ github.sha }}" || \
           gh release upload "${{ inputs.release_tag }}" Hi3HelperTools.zip --clobber
